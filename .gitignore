@@ -1,0 +1,5 @@
+**/build/
+**/CMakeUserPresets.json
+**/*.jdebug.user
+**/.mxproject
+**/__pycache__/
