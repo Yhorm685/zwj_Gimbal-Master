@@ -6,7 +6,7 @@
 #include <cstddef>
 
 namespace fw {
-// One Comm task owns USART1. RX and TX can be in flight independently.
+// One task owns each port. RX and TX can be in flight independently.
 class Uart {
 public:
     explicit Uart(UART_HandleTypeDef& handle) : handle_(handle) {}
@@ -58,6 +58,7 @@ private:
     Transfer rx_{};
     Wakeup wake_{};
     void* context_{};
-    static Uart* instance_;
+    bool bind();
+    static std::array<Uart*, 2> instances_;
 };
 }

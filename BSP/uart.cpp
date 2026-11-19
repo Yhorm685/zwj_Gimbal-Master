@@ -6,14 +6,25 @@
 namespace fw {
 using detail::IrqGuard;
 using detail::halStatus;
-Uart* Uart::instance_{};
+std::array<Uart*, 2> Uart::instances_{};
+
+// Caller holds the IRQ guard until the HAL operation has been started.
+bool Uart::bind() {
+    for (auto* port : instances_) {
+        if (port && &port->handle_ == &handle_) return port == this;
+    }
+    for (auto& port : instances_) {
+        if (!port) { port = this; return true; }
+    }
+    return false;
+}
 
 Uart::~Uart() {
     stopStream();
     cancelWrite();
     cancelRead();
     IrqGuard guard;
-    if (instance_ == this) instance_ = nullptr;
+    for (auto& port : instances_) if (port == this) port = nullptr;
 }
 
 bool Uart::ready() const {
@@ -58,8 +69,7 @@ Status Uart::start(bool receive, const std::uint8_t* data, std::size_t size, std
     if (!ready()) return Status::NotInitialized;
     IrqGuard guard;
     auto& op = receive ? rx_ : tx_;
-    if (op.owned || (receive && streaming_) || (instance_ && instance_ != this)) return Status::Busy;
-    instance_ = this;
+    if (op.owned || (receive && streaming_) || !bind()) return Status::Busy;
     if (!receive) std::memcpy(op.bytes.data(), data, size);
     op.size = static_cast<std::uint16_t>(size);
     op.started = HAL_GetTick();
@@ -104,8 +114,11 @@ Status Uart::finish(bool receive, bool cancel, std::uint8_t* out, std::size_t si
 }
 
 void Uart::completeFromIrq(UART_HandleTypeDef* handle, bool receive, Status result) {
-    auto* self = instance_;
-    if (!self || &self->handle_ != handle) return;
+    Uart* self = nullptr;
+    for (auto* port : instances_) {
+        if (port && &port->handle_ == handle) { self = port; break; }
+    }
+    if (!self) return;
     if (receive && self->streaming_) {
         self->receiveStreamFromIrq(result);
         return;
@@ -121,8 +134,7 @@ void Uart::completeFromIrq(UART_HandleTypeDef* handle, bool receive, Status resu
 Status Uart::startStream() {
     if (!ready()) return Status::NotInitialized;
     IrqGuard guard;
-    if (streaming_ || rx_.owned || (instance_ && instance_ != this)) return Status::Busy;
-    instance_ = this;
+    if (streaming_ || rx_.owned || !bind()) return Status::Busy;
     head_ = tail_ = 0;
     streamFault_ = Status::Ok;
     const auto result = HAL_UART_Receive_IT(&handle_, &nextByte_, 1);
