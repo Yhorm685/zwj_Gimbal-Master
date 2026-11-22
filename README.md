@@ -6,6 +6,33 @@
 
 驱动来自 [任务一 zwj_Frameworks 的固定提交](https://github.com/Yhorm685/zwj_Frameworks/tree/84fd7fd32720641116e82bf68de881d31b826de0)。任务二在独立仓库内维护所需的 Common、BSP、Module 和 F103 CubeMX 工程，保留 HAL、CMSIS、FreeRTOS 原始许可证。构建只需本仓库。
 
+## 构建与启动
+
+从仓库根目录打开 PowerShell。固件需要 Arm GNU Toolchain、CMake 和 Ninja。
+
+```powershell
+cd boards/f103
+cmake --preset Debug
+cmake --build --preset Debug
+cd ../..
+```
+
+使用 Ozone 打开 [F103 调试工程](boards/f103/f103.jdebug)，它会加载 `boards/f103/build/Debug/f103.elf`。Release 构建将两条命令的预设都改为 `Release`。首次烧录前先断开舵机电源，保留 IMU、调试器和 USB–TTL，便于单独验证采样与校准。
+
+电脑端使用带 Tk 的 Python 3.10 或更高版本。安装 pySerial 后运行上位机。
+
+```powershell
+python -m pip install pyserial
+python host/monitor.py
+```
+
+带 HC-05 的蓝牙串口负责目标指向，有线串口提供三轴波形、在线调参和 CSV 记录。接线、命令、测试和记录入口如下。
+
+- [板级接线图和实机验收顺序](docs/bringup.md)
+- [姿态解算、控制和命令协议](docs/control.md)
+- [上位机操作与带宽、阶跃、重复精度分析](host/README.md)
+- [构建与测试记录](docs/validation.md) · [AI 对话节选](docs/ai-session.md)
+
 ## 实施与验收
 
 | 阶段 | 交付和验证 |
